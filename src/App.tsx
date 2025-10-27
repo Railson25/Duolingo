@@ -16,11 +16,22 @@ import { UserDetailsSheet } from "./components/user-details-sheet";
 import { ChartsDashboard } from "./components/charts/charts-dashboard";
 import { KpiCards } from "./components/kpi-cards";
 import { LineSummary } from "./components/charts/line-summary";
+import { DEFAULT_USERNAMES } from "./config";
+
+function sanitizeList(arr: string[]): string[] {
+  return Array.from(new Set(arr.map((u) => u.trim()).filter(Boolean))).slice(
+    0,
+    5
+  );
+}
 
 export default function App() {
-  const [usernames, setUsernames] = useState<string[]>(() =>
-    loadSavedUsernames()
-  );
+  const [usernames, setUsernames] = useState<string[]>(() => {
+    const saved = loadSavedUsernames();
+    const merged = sanitizeList([...DEFAULT_USERNAMES, ...saved]);
+    return merged.length ? merged : sanitizeList([...DEFAULT_USERNAMES]);
+  });
+
   const [metric, setMetric] = useState<"xp" | "streak">("xp");
   const [rows, setRows] = useState<DuoUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,11 +59,35 @@ export default function App() {
     if (cached.length) setRows(sortByMetric(cached));
   }, [usernames, sortByMetric]);
 
+  useEffect(() => {
+    if (rows.length === 0 && usernames.filter(Boolean).length > 0) {
+      void (async () => {
+        setLoading(true);
+        try {
+          const fresh = await fetchUsersByUsernames(usernames.filter(Boolean));
+          if (fresh.length) {
+            upsertUsersCache(fresh);
+            setRows(sortByMetric(fresh));
+          }
+        } catch {
+          /* */
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, []);
+
   const sorted = useMemo(() => sortByMetric(rows), [rows, sortByMetric]);
 
   const updateUsername = (i: number, val: string) =>
-    setUsernames((prev) => prev.map((u, idx) => (idx === i ? val.trim() : u)));
-  const addRow = () => canAdd && setUsernames((prev) => [...prev, ""]);
+    setUsernames((prev) =>
+      sanitizeList(prev.map((u, idx) => (idx === i ? val.trim() : u)))
+    );
+
+  const addRow = () =>
+    canAdd && setUsernames((prev) => sanitizeList([...prev, ""]));
+
   const removeRow = (i: number) =>
     setUsernames((prev) => prev.filter((_, idx) => idx !== i));
 
