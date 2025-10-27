@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DuoUser } from "@/types/duolingo";
-import { fetchUsersByUsernames } from "@/lib/duo.api";
-
 import { getUserStreak, getUserXp } from "@/utils/helper";
 import {
   upsertUsersCache,
@@ -17,6 +15,8 @@ import { ChartsDashboard } from "./components/charts/charts-dashboard";
 import { KpiCards } from "./components/kpi-cards";
 import { LineSummary } from "./components/charts/line-summary";
 import { DEFAULT_USERNAMES } from "./config";
+
+type DuoUsersResponse = { users?: DuoUser[] };
 
 function sanitizeList(arr: string[]): string[] {
   return Array.from(new Set(arr.map((u) => u.trim()).filter(Boolean))).slice(
@@ -53,6 +53,31 @@ export default function App() {
     [metricValue]
   );
 
+  const fetchOne = useCallback(
+    async (username: string): Promise<DuoUser | null> => {
+      const res = await fetch(
+        `/api/users?username=${encodeURIComponent(username)}`
+      );
+      if (!res.ok) return null;
+      const json = (await res.json()) as DuoUsersResponse;
+      const user = Array.isArray(json?.users) ? json.users[0] : undefined;
+      return user ?? null;
+    },
+    []
+  );
+
+  const fetchSequential = useCallback(
+    async (list: string[]): Promise<DuoUser[]> => {
+      const acc: DuoUser[] = [];
+      for (const u of list) {
+        const user = await fetchOne(u);
+        if (user) acc.push(user);
+      }
+      return acc;
+    },
+    [fetchOne]
+  );
+
   useEffect(() => {
     saveUsernames(usernames);
     const cached = getCachedByUsernames(usernames.filter(Boolean));
@@ -60,22 +85,25 @@ export default function App() {
   }, [usernames, sortByMetric]);
 
   useEffect(() => {
-    if (rows.length === 0 && usernames.filter(Boolean).length > 0) {
-      void (async () => {
-        setLoading(true);
-        try {
-          const fresh = await fetchUsersByUsernames(usernames.filter(Boolean));
-          if (fresh.length) {
-            upsertUsersCache(fresh);
-            setRows(sortByMetric(fresh));
-          }
-        } catch {
-          /* */
-        } finally {
-          setLoading(false);
+    const list = usernames.filter(Boolean);
+    if (!list.length) return;
+
+    setLoading(true);
+    (async () => {
+      try {
+        const fresh = await fetchSequential(list);
+        if (fresh.length) {
+          upsertUsersCache(fresh);
+          setRows(sortByMetric(fresh));
         }
-      })();
-    }
+      } catch {
+        //
+      } finally {
+        setLoading(false);
+      }
+    })();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sorted = useMemo(() => sortByMetric(rows), [rows, sortByMetric]);
@@ -101,7 +129,7 @@ export default function App() {
         return;
       }
 
-      const fresh = await fetchUsersByUsernames(list);
+      const fresh = await fetchSequential(list);
       if (fresh.length === 0) throw new Error("Nenhum usuário encontrado.");
 
       upsertUsersCache(fresh);
