@@ -1,3 +1,4 @@
+import type { DuoUser } from "@/types/duolingo";
 import {
   Table,
   TableBody,
@@ -6,8 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import type { DuoUser } from "../types/duolingo";
-import { getUserStreak, getUserXp, resolvePictureUrl } from "../utils/helper";
+import { getUserStreak, getUserXp, resolvePictureUrl } from "@/utils/helper";
 
 type Props = {
   rows: DuoUser[];

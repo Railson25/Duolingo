@@ -1,3 +1,4 @@
+import type { DuoUser } from "@/types/duolingo";
 import {
   Sheet,
   SheetContent,
@@ -5,8 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/ui/sheet";
-import type { DuoUser } from "../types/duolingo";
-import { getUserStreak, getUserXp, resolvePictureUrl } from "../utils/helper";
+import { getUserStreak, getUserXp, resolvePictureUrl } from "@/utils/helper";
 
 type Props = {
   open: boolean;

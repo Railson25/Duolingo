@@ -4,3 +4,5 @@ export const DEFAULT_USERNAMES = [
   "mao12436",
   "I-ue",
 ] as const;
+
+export const DEFAULT_USERNAMES_MUTABLE: string[] = [...DEFAULT_USERNAMES];

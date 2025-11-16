@@ -1,4 +1,4 @@
-import type { DuoUser } from "../types/duolingo";
+import type { DuoUser } from "@/types/duolingo";
 
 export const getUserXp = (u: DuoUser): number => u.totalXp ?? 0;
 
