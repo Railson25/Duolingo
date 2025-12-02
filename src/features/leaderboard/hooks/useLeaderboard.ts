@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLeaderboardStore } from "../store/leaderboardStore";
 import { fetchDuolingoUsers } from "../services/duolingoApi";
 import { upsertUsersCache, getCachedByUsernames } from "@/lib/storage";
@@ -9,6 +9,8 @@ import { DEFAULT_USERNAMES_MUTABLE as DEFAULT_USERNAMES } from "@/config/config"
 export const useLeaderboard = () => {
   const store = useLeaderboardStore();
 
+  const hasAutoFetchedRef = useRef(false);
+
   const metricValue = (u: DuoUser) =>
     store.metric === "streak" ? getUserStreak(u) : getUserXp(u);
 
@@ -18,6 +20,7 @@ export const useLeaderboard = () => {
 
   useEffect(() => {
     const saved = getCachedByUsernames(DEFAULT_USERNAMES);
+
     if (saved.length) {
       store.setUsers(saved);
       store.setUsernames(
@@ -28,6 +31,7 @@ export const useLeaderboard = () => {
     } else {
       store.setUsernames(DEFAULT_USERNAMES);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refresh = async () => {
@@ -35,15 +39,36 @@ export const useLeaderboard = () => {
     store.setError(null);
     try {
       const fresh = await fetchDuolingoUsers(store.usernames);
-      if (fresh.length === 0) throw new Error("Nenhum usuário encontrado");
+
+      if (fresh.length === 0) {
+        throw new Error("Nenhum usuário encontrado");
+      }
+
       upsertUsersCache(fresh);
+
       store.setUsers(fresh);
     } catch (err) {
+      console.error("[useLeaderboard.refresh] erro:", err);
       store.setError(err instanceof Error ? err.message : "Erro ao buscar");
     } finally {
+      console.log("[useLeaderboard.refresh] finalizando, setLoading(false)");
       store.setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      !hasAutoFetchedRef.current &&
+      store.usernames.length > 0 &&
+      !store.loading
+    ) {
+      console.log("[useLeaderboard] chamando refresh automaticamente");
+      hasAutoFetchedRef.current = true;
+
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.usernames, store.loading]);
 
   return {
     ...store,
